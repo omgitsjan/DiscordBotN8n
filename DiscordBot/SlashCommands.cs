@@ -4,65 +4,38 @@ using DSharpPlus.SlashCommands;
 
 namespace DiscordBot
 {
+    /// <summary>
+    /// Discord slash commands for the AI-powered bot.
+    /// Provides a simple interface to interact with powerful n8n AI workflows.
+    /// </summary>
     public class SlashCommands(ISlashCommandsService slashCommandsService) : ApplicationCommandModule
     {
-        [SlashCommand("ping",
-            "This is a basic ping command to check if the Bot is online and what the current Latency is")]
+        private readonly ISlashCommandsService _slashCommandsService = slashCommandsService;
+
+        /// <summary>
+        /// Basic ping command to check bot responsiveness and latency.
+        /// </summary>
+        [SlashCommand("ping", "Check if the bot is online and measure response latency.")]
         public async Task PingSlashCommand(InteractionContext ctx)
         {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.PingSlashCommandAsync(context);
+            var context = new InteractionContextWrapper(ctx);
+            await _slashCommandsService.PingSlashCommandAsync(context);
         }
 
-        [SlashCommand("ChatGPT",
-            "Send a custom Text to the OpenAI - ChatGPT API and get a response from their AI based on your input")]
-        public async Task ChatSlashCommand(InteractionContext ctx,
-            [Option("prompt", "Write an input that the ChatGPT AI should respond to")]
-            string text)
+        /// <summary>
+        /// Main AI Agent command – sends user input to n8n AI workflows and returns an intelligent response.
+        /// Ask 'What tools do you have?' to see special agent functions beyond GPT.
+        /// </summary>
+        [SlashCommand(
+            "aiagent",
+            "Ask anything! Example: 'What tools do you have?' to see agent extensions beyond standard GPT.")]
+        public async Task AiAgentSlashCommand(
+            InteractionContext ctx,
+            [Option("message", "Your message or question for the AI agent.")]
+            string message)
         {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.ChatSlashCommandAsync(context, text);
-        }
-
-        [SlashCommand("DALL-E",
-            "Send a custom Text to the OpenAI - DALL-E Api and get a generated Image based on input")]
-        public async Task ImageSlashCommand(InteractionContext ctx,
-            [Option("prompt", "Write a Text on how the generated Image should look like")]
-            string text)
-        {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.ImageSlashCommandAsync(context, text);
-        }
-
-        [SlashCommand("Watch2Gether",
-            "Creates a room for you and your friends in Watch2Gether")]
-        public async Task Watch2GetherSlashCommand(InteractionContext ctx,
-            [Option("Video-URL", "Insert a Video-URL that should auto start after creating a Watch2Gether Room")]
-            string url = "")
-        {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.Watch2GetherSlashCommandAsync(context, url);
-        }
-
-        [SlashCommand("Weather", "Get the current weather for the specified city")]
-        public async Task WeatherSlashCommand(InteractionContext ctx,
-            [Option("city", "The city you want to get the weather for")]
-            string city)
-        {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.WeatherSlashCommandAsync(context, city);
-        }
-
-        [SlashCommand("crypto",
-            "Gets the price for a given Cryptocurrency")]
-        public async Task CryptoSlashCommand(InteractionContext ctx,
-            [Option("Symbol", "The Cryptocurrency you want to get the price for")]
-            string symbol = "BTC",
-            [Option("PhysicalCurrency", "The physical currency to compare against, e.g., USDT")]
-            string physicalCurrency = "USDT")
-        {
-            InteractionContextWrapper context = new(ctx);
-            await slashCommandsService.CryptoSlashCommandAsync(context, symbol, physicalCurrency);
+            var context = new InteractionContextWrapper(ctx);
+            await _slashCommandsService.AiAgentSlashCommandAsync(context, message);
         }
     }
 }

@@ -92,6 +92,8 @@ csharp_style_var_for_built_in_types = false:silent
 csharp_style_var_when_type_is_apparent = false:silent
 csharp_style_var_elsewhere = false:silent
 csharp_indent_labels = one_less_than_current
+csharp_style_prefer_implicitly_typed_lambda_expression = true:suggestion
+csharp_style_prefer_unbound_generic_type_in_nameof = true:suggestion
 
 [*.vb]
 #### Benennungsstile ####
@@ -176,3 +178,4 @@ dotnet_style_qualification_for_event = false:silent
 end_of_line = crlf
 tab_width = 4
 indent_size = 4
+dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion

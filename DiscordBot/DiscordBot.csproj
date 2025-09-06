@@ -29,10 +29,12 @@
 		<PackageReference Include="DSharpPlus.Interactivity" Version="4.5.1" />
 		<PackageReference Include="DSharpPlus.SlashCommands" Version="4.5.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
-		<PackageReference Include="NLog.Extensions.Logging" Version="6.0.3" />
+		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.14.0" />
+		<PackageReference Include="NLog.Extensions.Logging" Version="6.0.1" />
 		<PackageReference Include="RestSharp" Version="112.1.0" />
 	</ItemGroup>
 
@@ -50,13 +52,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Remove="Data\excuses.json" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Content Include="Data\excuses.json">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Content>
+	  <Folder Include="Models\" />
 	</ItemGroup>
 
 </Project>

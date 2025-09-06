@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using DiscordBot.Interfaces;
+﻿using DiscordBot.Interfaces;
 using DiscordBot.Services;
 using DiscordBot.Wrapper;
 using DSharpPlus;
@@ -13,234 +12,231 @@ using Microsoft.Extensions.Logging;
 using NLog;
 using NLog.Extensions.Logging;
 using RestSharp;
+using System.Diagnostics;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Timer = System.Timers.Timer;
 
 namespace DiscordBot
 {
+    /// <summary>
+    /// Main entry point for the Discord AI Bot powered by n8n workflows.
+    /// This bot provides a simple slash command interface to interact with powerful AI workflows.
+    /// </summary>
     public class Program
     {
-        /// <summary>
-        ///     This is the Discord token from the bot
-        /// </summary> 
         private string? _discordToken;
 
         /// <summary>
-        ///     The DiscordClient instance used for connecting to and interacting with Discord
+        /// The Discord client instance for bot communication
         /// </summary>
         public DiscordClient? Client { get; private set; }
 
         /// <summary>
-        ///     The ILogger instance used for logging messages
+        /// Global logger instance for application-wide logging
         /// </summary>
         public static ILogger? Logger { get; private set; }
 
         /// <summary>
-        ///     The IHelperService instance used for various helper functions
+        /// Application entry point
         /// </summary>
-        public static IHelperService? HelperService { get; private set; }
-
-        public static ICryptoService? CryptoService { get; private set; }
+        public static Task Main() => new Program().MainAsync();
 
         /// <summary>
-        ///     Init Program
+        /// Main application logic - initializes services, configures Discord client, and starts the bot
         /// </summary>
-        public static Task Main()
+        public async Task MainAsync()
         {
-            return new Program().MainAsync();
+            try
+            {
+                // Configure logging
+                LogManager.Setup().LoadConfigurationFromFile("nlog.config");
+
+                // Load application configuration
+                IConfigurationRoot configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                    .AddEnvironmentVariables() // Allow environment variable overrides
+                    .Build();
+
+                // Configure dependency injection
+                await using ServiceProvider services = ConfigureServices(configuration);
+
+                // Initialize core services
+                Logger = services.GetRequiredService<ILogger<Program>>();
+
+                Log("🤖 Discord AI Bot Starting...", LogLevel.Information);
+                Log("⚙️  Powered by n8n workflows", LogLevel.Information);
+
+                // Validate Discord token
+                _discordToken = configuration["DiscordBot:Token"];
+                if (string.IsNullOrWhiteSpace(_discordToken))
+                {
+                    Log("❌ Discord token not found! Please set 'DiscordBot:Token' in configuration.", LogLevel.Critical);
+                    Environment.Exit(1);
+                    return;
+                }
+
+                Log($"✅ Discord token loaded (ending with: ...{_discordToken[^4..]})", LogLevel.Debug);
+
+                // Configure Discord client
+                var discordConfig = new DiscordConfiguration
+                {
+                    Token = _discordToken,
+                    TokenType = TokenType.Bot,
+                    Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildMessages,
+                    LoggerFactory = services.GetService<ILoggerFactory>(),
+                    AutoReconnect = true
+                };
+
+                Client = new DiscordClient(discordConfig);
+
+                // Configure slash commands
+                var slashCommands = Client.UseSlashCommands(new SlashCommandsConfiguration
+                {
+                    Services = services
+                });
+                slashCommands.RegisterCommands<SlashCommands>();
+
+                // Configure interactivity (for future features)
+                Client.UseInteractivity(new InteractivityConfiguration
+                {
+                    Timeout = TimeSpan.FromMinutes(2)
+                });
+
+                // Set up event handlers
+                Client.Ready += OnClientReady;
+                Client.GuildAvailable += OnGuildAvailable;
+
+                Log("🚀 Starting Discord connection...", LogLevel.Information);
+
+                // Connect to Discord
+                await Client.ConnectAsync();
+
+                // Start status rotation
+                StartStatusRotation();
+
+                Log("✅ Bot is now online and ready!", LogLevel.Information);
+                Log("💡 Use /aiagents to interact with AI workflows", LogLevel.Information);
+
+                // Keep the application running
+                await Task.Delay(-1);
+            }
+            catch (Exception ex)
+            {
+                Log($"❌ Fatal error during startup: {ex.Message}", LogLevel.Critical);
+                Environment.Exit(1);
+            }
         }
 
         /// <summary>
-        ///     Main Program
+        /// Event handler for when the client is ready
         /// </summary>
-        /// <returns></returns>
-        public async Task MainAsync()
+        private Task OnClientReady(DiscordClient sender, DSharpPlus.EventArgs.ReadyEventArgs args)
         {
-            // Configure NLog
-            LogManager.Setup().LoadConfigurationFromFile("nlog.config");
+            Log($"🎯 Bot is ready! Logged in as {sender.CurrentUser.Username}#{sender.CurrentUser.Discriminator}", LogLevel.Information);
+            return Task.CompletedTask;
+        }
 
-            // Load the configuration from the appsettings.json file
-            IConfigurationRoot configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json")
-                .Build();
+        /// <summary>
+        /// Event handler for when a guild becomes available
+        /// </summary>
+        private Task OnGuildAvailable(DiscordClient sender, DSharpPlus.EventArgs.GuildCreateEventArgs args)
+        {
+            Log($"📡 Connected to guild: {args.Guild.Name} ({args.Guild.MemberCount} members)", LogLevel.Debug);
+            return Task.CompletedTask;
+        }
 
-            // Using decadency injection to configure all services
-            await using ServiceProvider services = ConfigureServices(configuration);
-
-            Logger = services.GetService<ILogger<Program>>();
-            HelperService = services.GetService<IHelperService>();
-            CryptoService = services.GetService<ICryptoService>();
-
-            if (HelperService == null || Logger == null || CryptoService == null)
-            {
-                Log(
-                    "Not all Services could be loaded. Please check the code or open a Issue on Github via omgitsjan/DiscordBotAI!",
-                    LogLevel.Critical);
-                Environment.Exit(500);
-                return;
-            }
-
-            // Retrieve the Discord token from the configuration
-            _discordToken = configuration["DiscordBot:Token"] ?? string.Empty;
-
-            if (string.IsNullOrEmpty(_discordToken))
-            {
-                Log("Could not load Discord token. Please check if a valid token was provided and restart the bot!",
-                    LogLevel.Error);
-                Environment.Exit(404);
-                return;
-            }
-            Log("Got Token: " + _discordToken);
-
-            // Create a new Discord client with specified gateway intents
-            DiscordConfiguration config = new()
-            {
-                Token = _discordToken,
-                TokenType = TokenType.Bot,
-                Intents = DiscordIntents.AllUnprivileged | DiscordIntents.GuildMessages,
-                LoggerFactory = services.GetService<ILoggerFactory>()
-            };
-
-            // Creating the Discord Bot Client
-            Client = new DiscordClient(config);
-
-            // Configured the Slash Commands
-            SlashCommandsExtension? slashCommandsConfig = Client.UseSlashCommands(new SlashCommandsConfiguration
-            {
-                Services = services
-            });
-            slashCommandsConfig.RegisterCommands<SlashCommands>();
-
-
-            Client.UseInteractivity(new InteractivityConfiguration
-            {
-                Timeout = TimeSpan.FromMinutes(1)
-            });
-
-            // Log messages to the console
-            Log("omgitsjan/DiscordBot is running!");
-
-            if (IsDebug())
-            {
-                Log("Debug Mode...", LogLevel.Debug);
-            }
-
-            // Connect to Discord
-            await Client.ConnectAsync();
-
-            // Set up the timer to change the status every 30 seconds
-            int statusIndex = 0; // This variable helps us cycle through the different statuses
-            Timer timer = new(15000); // Set the timer to execute every 30 seconds
+        /// <summary>
+        /// Starts the rotating status display showing various bot statistics
+        /// </summary>
+        private void StartStatusRotation()
+        {
+            int statusIndex = 0;
+            var timer = new Timer(20000); // 20 seconds per status
 
             timer.Elapsed += async (_, _) =>
             {
-                switch (statusIndex)
+                try
                 {
-                    case 0:
-                        (bool success, string? currentBitcoinPrice) = await CryptoService.GetCryptoPriceAsync("BTC", "USDT");
-                        DiscordActivity activity1 =
-                            new(
-                                $"BTC: ${(currentBitcoinPrice.Length > 110 ? currentBitcoinPrice[..110] : currentBitcoinPrice)}",
-                                ActivityType.Watching);
-                        if (!success)
-                        {
-                            activity1.Name = "Failed to fetch BTC Price...";
-                        }
+                    if (Client?.CurrentUser == null) return;
 
-                        await Client.UpdateStatusAsync(activity1);
-                        break;
-                    case 1:
-                        string currentDate = DateTime.UtcNow.ToString("dd.MM.yyyy");
-                        await Client.UpdateStatusAsync(new DiscordActivity($"Date: {currentDate}",
-                            ActivityType.Watching));
-                        break;
-                    case 2:
-                        string currentDateTime = DateTime.UtcNow.ToString("HH:mm");
-                        await Client.UpdateStatusAsync(new DiscordActivity($"Time: {currentDateTime} UTC",
-                            ActivityType.Watching));
-                        break;
-                    case 3:
-                        TimeSpan uptime = DateTime.UtcNow - Process.GetCurrentProcess().StartTime.ToUniversalTime();
-                        string uptimeString = $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m";
-                        await Client.UpdateStatusAsync(
-                            new DiscordActivity($"Uptime: {uptimeString}", ActivityType.Watching));
-                        break;
-                    case 4:
-                        int memberCount = Client.Guilds.Sum(g => g.Value.MemberCount);
-                        await Client.UpdateStatusAsync(new DiscordActivity(
-                            $"Available to '{memberCount}' Users", ActivityType.Watching));
-                        break;
-                    case 5:
-                        string? developerExcuse = await HelperService.GetRandomDeveloperExcuseAsync();
-                        await Client.UpdateStatusAsync(new DiscordActivity(
-                            $"Excuse: {(developerExcuse.Length > 110 ? developerExcuse[..110] : developerExcuse)}",
-                            ActivityType.ListeningTo));
-                        break;
-                    case 6:
-                        await Client.UpdateStatusAsync(new DiscordActivity(
-                            "omgitsjan/DiscordBotAI | janpetry.de",
-                            ActivityType.Watching));
-                        break;
+                    var activity = statusIndex switch
+                    {
+                        0 => new DiscordActivity("🤖 AI-powered by n8n", ActivityType.Playing),
+                        1 => new DiscordActivity($"📅 {DateTime.UtcNow:dd.MM.yyyy HH:mm} UTC", ActivityType.Watching),
+                        2 => new DiscordActivity($"⏱️ {GetUptimeString()}", ActivityType.Watching),
+                        3 => new DiscordActivity($"👥 {GetTotalMemberCount()} users", ActivityType.Watching),
+                        _ => new DiscordActivity("💬 /aiagent for AI help", ActivityType.ListeningTo)
+                    };
+
+                    await Client.UpdateStatusAsync(activity);
+                    statusIndex = (statusIndex + 1) % 5;
                 }
-
-                statusIndex = (statusIndex + 1) % 7; // Cycle through the status options
+                catch (Exception ex)
+                {
+                    Log($"Error updating status: {ex.Message}", LogLevel.Warning);
+                }
             };
 
             timer.AutoReset = true;
-            timer.Enabled = true;
-
-            // Block this program until it is closed
-            await Task.Delay(-1);
+            timer.Start();
         }
 
         /// <summary>
-        ///     This method logs messages to the console
+        /// Gets the formatted uptime string
         /// </summary>
-        /// <param name="msg"></param>
-        /// <param name="logLevel"></param>
-        /// <returns></returns>
-        internal static void Log(string? msg,
-            LogLevel logLevel = LogLevel.Information)
+        private static string GetUptimeString()
+        {
+            var uptime = DateTime.UtcNow - Process.GetCurrentProcess().StartTime.ToUniversalTime();
+            return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m";
+        }
+
+        /// <summary>
+        /// Gets the total member count across all guilds
+        /// </summary>
+        private int GetTotalMemberCount()
+        {
+            return Client?.Guilds?.Sum(g => g.Value.MemberCount) ?? 0;
+        }
+
+        /// <summary>
+        /// Centralized logging method with enhanced formatting
+        /// </summary>
+        internal static void Log(string? message, LogLevel logLevel = LogLevel.Information)
         {
             if (Logger != null)
             {
-                Logger.Log(logLevel, "{Message}", msg);
+                Logger.Log(logLevel, "{Message}", message);
             }
             else
             {
-                Console.WriteLine(msg);
+                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                var level = logLevel.ToString().ToUpper().PadRight(11);
+                Console.WriteLine($"[{timestamp}] [{level}] {message}");
             }
         }
 
         /// <summary>
-        ///     This method handles the ServiceCollection creation/configuration, and builds out the service provider we can call
-        ///     on later
+        /// Configures dependency injection container with all required services
         /// </summary>
-        /// <returns></returns>
         private static ServiceProvider ConfigureServices(IConfiguration configuration)
         {
             return new ServiceCollection()
                 .AddSingleton(configuration)
                 .AddSingleton<IHttpService, HttpService>()
-                .AddSingleton<IWatch2GetherService, Watch2GetherService>()
-                .AddSingleton<IOpenWeatherMapService, OpenWeatherMapService>()
-                .AddSingleton<IOpenAiService, OpenAiService>()
-                .AddSingleton<ICryptoService, CryptoService>()
-                .AddSingleton<IHelperService, HelperService>()
-                .AddSingleton<IInteractionContextWrapper, InteractionContextWrapper>()
+                .AddSingleton<IIn8nService, N8nService>()
+                .AddTransient<IInteractionContextWrapper, InteractionContextWrapper>()
                 .AddSingleton<ISlashCommandsService, SlashCommandsService>()
                 .AddSingleton<SlashCommands>()
                 .AddSingleton<IRestClient>(_ => new RestClient())
-                .AddLogging(loggingBuilder => loggingBuilder.AddNLog())
+                .AddLogging(builder => builder.AddNLog())
                 .BuildServiceProvider();
         }
 
         /// <summary>
-        ///     Check if the programm is running in Debug mode
+        /// Determines if the application is running in debug mode
         /// </summary>
-        /// <returns>Boolean that indicates if the bot is running in Debug mode</returns>
         private static bool IsDebug()
         {
 #if DEBUG
