@@ -29,7 +29,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: omgitsjan/discordbotai:latest, omgitsjan/discordbotai:${{ github.event.release.tag_name }}
+          tags: omgitsjan/discordbotn8n:latest, omgitsjan/discordbotn8n:${{ github.event.release.tag_name }}
 
       - name: Log out of Docker Hub
         run: docker logout
