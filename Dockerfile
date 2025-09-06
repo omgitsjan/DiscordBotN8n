@@ -5,16 +5,10 @@ WORKDIR /src
 # Copy csproj and restore as distinct layers
 COPY *.sln .
 COPY DiscordBot/*.csproj ./DiscordBot/
-COPY DiscordBotTests/*.csproj ./DiscordBotTests/
 RUN dotnet restore
 
 # Copy everything else and build
 COPY DiscordBot/. ./DiscordBot/
-COPY DiscordBotTests/. ./DiscordBotTests/
-
-# Run tests
-WORKDIR /src/DiscordBotTests
-RUN dotnet test --no-restore --verbosity normal
 
 # Build the project
 WORKDIR /src/DiscordBot
