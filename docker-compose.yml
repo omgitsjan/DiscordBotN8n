@@ -1,14 +1,10 @@
 version: "3"
-
 services:
-  discordbotai:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - TAG=latest
+  discordbotn8n:
     image: omgitsjan/discordbotn8n:latest
-    volumes:
-      - ./DiscordBot/appsettings.json:/app/appsettings.json
+    environment:
+      - DiscordBot__Token=${DISCORD_TOKEN}
+      - n8n__ApiKey=${N8N_API_KEY}
+      - n8n__AiAgentWorkflowUrl=${N8N_AIAGENT_URL}
     ports:
       - 80:80
