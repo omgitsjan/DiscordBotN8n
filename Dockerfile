@@ -2,22 +2,29 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy sln and csproj, restore as separate layers
+# Copy solution and project files
 COPY *.sln .
 COPY DiscordBot/*.csproj ./DiscordBot/
+COPY DiscordBotTests/*.csproj ./DiscordBotTests/
+
+# Restore dependencies
 RUN dotnet restore
 
-# Copy all bot source files
+# Copy all source files
 COPY DiscordBot/. ./DiscordBot/
+COPY DiscordBotTests/. ./DiscordBotTests/
 
-# Build and publish (portable, self-contained if you want)
+# Run tests (fail build if any test fails)
+WORKDIR /src/DiscordBotTests
+RUN dotnet test --no-restore --verbosity normal
+
+# Build and publish the main app (only if tests passed)
 WORKDIR /src/DiscordBot
 RUN dotnet publish -c Release -o /app
 
-# Stage 2: Runtime
+# Stage 2: Setup runtime
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /app .
 
-# Healthy, minimal entrypoint
 ENTRYPOINT ["dotnet", "DiscordBot.dll"]
