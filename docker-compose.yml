@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         - TAG=latest
-    image: omgitsjan/discordbotai:latest
+    image: omgitsjan/discordbotn8n:latest
     volumes:
       - ./DiscordBot/appsettings.json:/app/appsettings.json
     ports:
