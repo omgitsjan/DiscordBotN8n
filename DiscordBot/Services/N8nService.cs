@@ -20,7 +20,7 @@ namespace DiscordBot.Services
         /// Supports both raw text and JSON-based responses from the n8n workflow.
         /// </summary>
         /// <param name="prompt">User's input message</param>
-        /// <param name="userId">Discord user ID – used for session continuity</param>
+        /// <param name="userId">Discord user ID â€“ used for session continuity</param>
         /// <returns>(success, response or error message)</returns>
         public async Task<Tuple<bool, string>> AiAgentAsync(string prompt, string userId)
         {
@@ -28,7 +28,7 @@ namespace DiscordBot.Services
             string? responseText;
 
             // Load and validate configuration
-            string agentUrl = _configuration["n8n:AiAgentWorkflowUrl"] ?? "https://n8n.janpetry.de/webhook-test/discordbot";
+            string agentUrl = _configuration["n8n:AiAgentWorkflowUrl"];
             string apiKey = _configuration["n8n:ApiKey"] ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(agentUrl) || string.IsNullOrWhiteSpace(apiKey))
